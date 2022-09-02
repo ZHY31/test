@@ -1,0 +1,100 @@
+#!/usr/bin/python
+# -*-coding:utf8 -*-
+
+__author__="wanglongfei"
+__version__="1.0"
+
+'''
+	对输入的测序文件检查其数据量，质量体系等信息
+	检查输入
+	配置文件解析
+	脚本生成
+	核心代码
+	日志记录
+	统计
+	QC报告
+	monitor 调度
+'''
+import re
+import sys
+import os
+from optparse import OptionParser
+from lib import input_parse
+from lib import generate_script
+class Main():
+	def __init__(self):
+		self.parser=OptionParser(version=__version__)
+		self.config_info={}
+	def parse_commandLine(self):
+		self.parser.add_option("-c","--config",dest="config",action="store",metavar="config FILE",help="配置文件路径")
+		self.parser.add_option("-d","--datalist",dest="datalist",action="store",metavar="data FILE",help="原始测序数据列表")
+		self.parser.add_option("-o","--outdir",dest="outdir",action="store",metavar="PATH",help="工作目录")
+		self.parser.add_option("-g","--check",dest="diagnose",action="store_true",metavar="CHECK",help="检查输入数据的开关")
+		(self.options,self.args)=self.parser.parse_args()
+		if(not self.options.config or not self.options.datalist or not self.options.outdir):
+			self.parser.print_help()
+			sys.exit()
+		print("启动流程")
+		self.config_info["rawdatafile"]=self.options.datalist
+		self.config_info["configfile"]=self.options.config
+		self.options.outdir=os.path.abspath(self.options.outdir)
+		self.config_info["outdir"]=self.options.outdir
+	def process(self):
+		self.parse_commandLine()
+		self._parse_input()
+		self._construct_dir()
+		self._generate_shell()
+		self._generate_monitor()
+
+	def _construct_dir(self):
+		for d in ("QC","process","shell","result","stat","upload","report","module"):
+			if(not os.path.isdir(self.options.outdir+"/"+d)):
+				os.system("mkdir -p "+self.options.outdir+"/"+d)
+	def _parse_input(self):
+		config=input_parse.Config(self.options.config)
+		data=input_parse.Data(self.options.datalist)
+		self.config_info["config"]=config.parse()
+		self.config_info["rawdata"]=data.parse()
+	def _generate_shell(self):
+		g=generate_script.Generate(self.config_info)
+		self.scripts=g.process()
+	def _generate_monitor(self):
+		fout=open(self.options.outdir+"/monitor_dependence.txt","w")
+		'''
+		for s in self.scripts["filter"]:
+			for l in self.scripts["filter"][s]:
+				t=self.scripts["filter"][s][l]
+				fout.write(self.scripts["start"]+":0.5G:1cpu\t"+t+":0.5G:1cpu\n")
+				fout.write(t+":0.5G:1cpu\t"+self.scripts["QC"]+":0.5G:1cpu\n")
+				fout.write(t+":0.5G:1cpu\t"+self.scripts["merge"]+":0.5G:1cpu\n")
+		fout.write(self.scripts["merge"]+":0.5G:1cpu\t"+self.scripts["report"]+":0.5G:1cpu\n")
+		fout.write(self.scripts["QC"]+":0.5G:1cpu\t"+self.scripts["end"]+":0.5G:1cpu\n")
+		fout.write(self.scripts["report"]+":0.5G:1cpu\t"+self.scripts["end"]+":0.5G:1cpu\n")
+		'''
+		# 每个模块的脚本合并到一块
+		for k in self.scripts:
+			f=self.scripts[k]
+			fin=open(f,"r")
+			for line in fin:
+				fout.write(line)
+			fin.close()
+		start=self.options.outdir+"/shell/start.sh"
+		end=self.options.outdir+"/shell/end.sh"
+		A_start=self.options.outdir+"/module/A/shell/start.sh"
+		A_end=self.options.outdir+"/module/A/shell/end.sh"
+		B_start=self.options.outdir+"/module/B/result/shell/start.sh"
+		B_end=self.options.outdir+"/module/B/result/shell/end.sh"
+
+		fout.write(start+":0.5G:1cpu\t"+A_start+":0.5G:1cpu\n")
+		fout.write(A_end+":0.5G:1cpu\t"+B_start+":0.5G:1cpu\n")
+		fout.write(B_end+":0.5G:1cpu\t"+end+":0.5G:1cpu\n")
+		fout.close()
+
+		fout=open(self.options.outdir+"/qsub.sh","w")
+		fout.write("python3 /data/test/minimoni.py "+self.options.outdir+"/monitor_dependence.txt")
+		fout.close()
+
+if(__name__=="__main__"):
+	m=Main()
+	#m.parse_commandLine()
+	m.process()
