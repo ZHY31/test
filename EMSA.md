@@ -36,7 +36,7 @@
 | :-:|:-:|:-:|:-:
 |洗脱液浓度|500 mM咪唑|10-20 mM GSH洗液|0.4%麦芽糖（现配现用）
 pH|7.9|8.0|TBST溶解
-#凝胶阻滞电泳
+# 凝胶阻滞电泳   
 ***试剂、耗材***
 1. LightShift 化学发光法EMSA试剂盒（ Gelshift<sup>TM</sup> Chemiluminescent EMSA Kit，20148，赛默飞），使用前将Blocking buffer & Washing buffer进行37-50℃温水浴，直至颗粒全部溶解，放置室温待用。
 2. 10% APS
